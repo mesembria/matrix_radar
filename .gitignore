@@ -1,0 +1,16 @@
+# Real credentials: never commit (example_secrets.py / settings.toml.example are the templates)
+secrets.py
+secrets.yaml
+settings.toml
+.env*
+
+# Build/cache
+.esphome/
+__pycache__/
+*.pyc
+.superpowers/
+
+# macOS
+.DS_Store
+._*
+.metadata_never_index

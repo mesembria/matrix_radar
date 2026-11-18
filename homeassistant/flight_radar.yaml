@@ -1,0 +1,68 @@
+# Flight radar package for Home Assistant.
+# Put this file in config/packages/ and make sure configuration.yaml has:
+#   homeassistant:
+#     packages: !include_dir_named packages
+#
+# Needs the Flightradar24 integration (HACS) with its radius set to 20 miles,
+# and the MQTT integration (the panel gets its data over MQTT).
+
+template:
+  - sensor:
+      - name: "Flight radar planes"
+        unique_id: flight_radar_planes
+        icon: mdi:airplane
+        state: >
+          {{ (state_attr('sensor.flightradar24_current_in_area', 'flights') or [])
+             | rejectattr('on_ground') | list | count }}
+        attributes:
+          # One compact string for the matrix:
+          #   id,route,type,x,y,heading,speed,height,model;...
+          # x and y are tenths of a mile east and north of home.
+          # Height is feet above the ground at your house, not above sea level.
+          packed: >-
+            {%- set ground_ft = 5240 -%}{#- your house's elevation in feet -#}
+            {%- set max_planes = 40 -%}
+            {%- set flights = state_attr('sensor.flightradar24_current_in_area', 'flights') or [] -%}
+            {%- set hlat = state_attr('zone.home', 'latitude') | float(0) -%}
+            {%- set hlon = state_attr('zone.home', 'longitude') | float(0) -%}
+            {%- set kx = 69.17 * cos(hlat * pi / 180) -%}
+            {%- set ns = namespace(items=[]) -%}
+            {%- for f in flights if not f.on_ground and f.latitude is number and f.longitude is number -%}
+              {%- set dx = (f.longitude - hlon) * kx -%}
+              {%- set dy = (f.latitude - hlat) * 69.05 -%}
+              {%- set ident = (f.flight_number or f.aircraft_registration or f.callsign or '?')
+                  | string | upper | regex_replace('[^A-Z0-9]', '') -%}
+              {%- set o = (f.airport_origin_code_iata or '') | string | upper -%}
+              {%- set d = (f.airport_destination_code_iata or '') | string | upper -%}
+              {%- set route = (o ~ '>' ~ d) if (o and d) else '' -%}
+              {%- set type = (f.aircraft_code or '') | string | upper | regex_replace('[^A-Z0-9]', '') -%}
+              {%- set model = ((f.aircraft_model or '') | string | upper | regex_replace('[^A-Z0-9 -]', '') | trim)[:16] | trim -%}
+              {%- set agl = [((f.altitude | float(0)) - ground_ft) / 100, 0] | max | round(0) | int * 100 -%}
+              {%- set rec = [ident, route, type,
+                    (dx * 10) | round(0) | int, (dy * 10) | round(0) | int,
+                    f.heading | int(0), f.ground_speed | int(0), agl, model] | join(',') -%}
+              {%- set ns.items = ns.items + [dict(dist=(dx * dx + dy * dy) ** 0.5, rec=rec)] -%}
+            {%- endfor -%}
+            {{- (ns.items | sort(attribute='dist') | map(attribute='rec') | list)[:max_planes] | join(';') -}}
+
+automation:
+  # Send the planes to the panel. The board subscribes to this topic.
+  # The time trigger matters: with no planes around, "packed" stays empty and
+  # never changes, and the panel would show NO DATA.
+  - id: flight_radar_publish
+    alias: "Flight radar: send planes to the panel"
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: sensor.flight_radar_planes
+        attribute: packed
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        seconds: "/30"
+    actions:
+      - action: mqtt.publish
+        data:
+          topic: flight_radar/planes
+          payload: "{{ state_attr('sensor.flight_radar_planes', 'packed') or '' }}"
+          retain: true
