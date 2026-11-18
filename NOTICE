@@ -1,5 +1,5 @@
 Third-party code: `backup/weather-display/` is a copy of Adafruit's Matrix
 Portal weather display example and its bundled CircuitPython libraries. It is
-not covered by the MIT license above; it keeps its own license (Apache 2.0,
+not covered by this project's MIT license (see LICENSE); it keeps its own license (Apache 2.0,
 see `backup/weather-display/LICENSE`, plus the licenses of the Adafruit
 libraries in `backup/weather-display/lib/`).
