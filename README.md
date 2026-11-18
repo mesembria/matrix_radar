@@ -96,3 +96,9 @@ Home Assistant turns the Flightradar24 data into one short string with each plan
 - Runs on the Matrix Portal M4 with CircuitPython 10.3.1. Connects to MQTT and shows up in Home Assistant.
 - Every screen matches the original drawing pixel for pixel in the desktop tests (`test/cp/`).
 - Not yet checked on the real panel with live flights.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+`backup/weather-display/` is third-party code from Adafruit and keeps its own Apache 2.0 license.
